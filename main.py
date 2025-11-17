@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 # 下面这些只是示例，请换成你自己在新浪财经等网站上复制的 RSS 链接
 RSS_URLS = [
     # 示例：把这些替换成具体的 RSS 地址，例如新浪财经股票频道的 rss 链接等
-    https://link.juejin.cn/?target=https%3A%2F%2Fplink.anyfeeder.com%2Ffortunechina%2Fshangye
+     "https://plink.anyfeeder.com/fortunechina/shangye",
 ]
 
 # 最近几天内的新闻才推送（含当天），你可以改成 1 或 3 等
