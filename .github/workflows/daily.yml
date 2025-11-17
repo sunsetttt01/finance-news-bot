@@ -1,0 +1,30 @@
+name: Daily Finance News
+
+on:
+  schedule:
+    # 每天 00:30 UTC = 北京/新加坡时间 08:30
+    - cron: "30 0 * * *"
+  workflow_dispatch:  # 手动触发也可以
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install feedparser requests
+
+      - name: Run script
+        env:
+          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+        run: |
+          python main.py
