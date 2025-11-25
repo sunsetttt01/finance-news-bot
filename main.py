@@ -4,18 +4,14 @@ import requests
 import feedparser
 from datetime import datetime, timedelta, timezone
 
-# ======= RSS 信息源（已帮你换成真实目标地址）=======
+# ================== 配置区域 ==================
+
+# RSS 信息源（已经包含你要的那两个）
 RSS_URLS = [
-   RSS_URLS = [
-    # FortuneChina（你之前实测是能推送出来的）
-    "https://plink.anyfeeder.com/fortunechina",
-
-    # 凤凰财经：今日要闻
-    "http://finance.ifeng.com/rss/headnews.xml",
-
-    # 东方财富：策略报告（RSSHub 提供）
-    "https://rsshub.app/eastmoney/report/strategyreport",
-
+    "https://plink.anyfeeder.com/fortunechina",                 # FortuneChina
+    "https://rss.sina.com.cn/roll/finance/hot_roll.xml",        # 新浪财经 要闻汇总
+    "http://finance.ifeng.com/rss/headnews.xml",                # 凤凰财经 今日要闻
+    "https://rsshub.app/eastmoney/report/strategyreport",       # 东方财富 策略报告（RSSHub）
 ]
 
 # 最近几天内的新闻才推送（含当天）
@@ -24,8 +20,12 @@ RECENT_DAYS = 3
 # 每天推送的最大条数
 MAX_ITEMS = 20
 
+# 如果关键词过滤后少于这个数，就启用兜底模式
+MIN_ITEMS_AFTER_KEYWORDS = 5
+
 # 只保留包含这些关键词的新闻（标题内包含任意一个即可）
-KEYWORDS = [# 直接点名股市 / 公司
+KEYWORDS = [
+    # 直接点名股市 / 公司
     "A股", "沪深", "沪深两市", "中国股市",
     "上市公司", "IPO", "首发上市", "再融资",
     "分红", "派息", "高股息", "回购", "减持", "增持",
@@ -33,13 +33,13 @@ KEYWORDS = [# 直接点名股市 / 公司
     "重组", "并购", "资产重组", "股权转让", "控股权",
     "退市", "摘牌",
 
-    # 政策 / 市场环境（最近新闻里很热）
+    # 政策 / 市场环境
     "新国九条", "市值管理",
     "中证", "沪深300",
     "中特估", "中字头",
     "注册制", "北向资金",
 
-    # 热门赛道 & 行业（新闻里和上市公司经常一起出现）
+    # 热门赛道 & 行业
     "新质生产力",
     "新能源", "光伏", "风电", "锂电",
     "新能源汽车", "智能汽车",
@@ -47,10 +47,13 @@ KEYWORDS = [# 直接点名股市 / 公司
     "AI", "人工智能", "大模型", "算力",
     "高端制造", "机器人",
     "医药", "创新药",
-    "消费电子",]
+    "消费电子",
+]
 
 # GitHub Actions 运行时是 UTC，这里设定北京时间（UTC+8）
 BEIJING_TZ = timezone(timedelta(hours=8))
+
+# ================== 功能函数 ==================
 
 
 def matches_keywords(entry):
@@ -61,7 +64,16 @@ def matches_keywords(entry):
     return any(k in title for k in KEYWORDS)
 
 
-def fetch_news():
+def has_chinese(title: str) -> bool:
+    """判断标题里是否包含至少一个中文字符，用于兜底过滤"""
+    return any("\u4e00" <= ch <= "\u9fff" for ch in title)
+
+
+def fetch_all_entries():
+    """
+    抓取所有 RSS 源里的原始 entries，
+    做时间过滤+排序+去重，但不按关键词筛。
+    """
     items = []
     for url in RSS_URLS:
         if not url.strip():
@@ -105,25 +117,54 @@ def fetch_news():
         reverse=True,
     )
 
-    # 去重 + 关键词过滤
+    # 去重（按 link）
     seen_links = set()
-    result_entries = []
+    unique_entries = []
     for _, e in filtered:
-        # 关键词过滤：只要标题里含有 KEYWORDS 任意一个
-        if KEYWORDS and not matches_keywords(e):
-            continue
-
         link = (e.get("link") or "").strip()
+        if link and link in seen_links:
+            continue
         if link:
-            if link in seen_links:
-                continue
             seen_links.add(link)
+        unique_entries.append(e)
 
-        result_entries.append(e)
-        if len(result_entries) >= MAX_ITEMS:
+    return unique_entries
+
+
+def fetch_news():
+    """先按关键词筛；太少就兜底不过滤关键词，但要求是中文标题"""
+    all_entries = fetch_all_entries()
+    if not all_entries:
+        return []
+
+    # 先按关键词过滤
+    keyword_entries = [e for e in all_entries if matches_keywords(e)]
+
+    if len(keyword_entries) >= MIN_ITEMS_AFTER_KEYWORDS:
+        print(f"[INFO] 关键词过滤后条数：{len(keyword_entries)}，足够，直接使用。")
+        return keyword_entries[:MAX_ITEMS]
+
+    # 不足则兜底：不过滤关键词，但要求标题是中文（至少一个中文字符）
+    print(
+        f"[INFO] 关键词过滤后条数只有 {len(keyword_entries)}，"
+        f"低于 {MIN_ITEMS_AFTER_KEYWORDS}，启用兜底模式（中文标题优先）。"
+    )
+
+    fallback_entries = []
+    for e in all_entries:
+        title = (e.get("title") or "").strip()
+        if not title:
+            continue
+        if has_chinese(title):
+            fallback_entries.append(e)
+        if len(fallback_entries) >= MAX_ITEMS:
             break
 
-    return result_entries
+    # 如果连兜底都凑不齐，就把已有的返回
+    if fallback_entries:
+        return fallback_entries[:MAX_ITEMS]
+    else:
+        return keyword_entries[:MAX_ITEMS]
 
 
 def format_text(entries):
@@ -132,13 +173,14 @@ def format_text(entries):
     if not entries:
         return (
             f"{bj_now} 上市公司 / 财经新闻精选（最近{RECENT_DAYS}天）：\n\n"
-            f"当前未找到符合关键词 {KEYWORDS} 的新闻。\n"
-            f"（说明：已启用关键词过滤，只推送标题中包含这些关键词的新闻）"
+            f"当前未找到符合条件的新闻。\n"
+            f"（说明：先按关键词过滤，再按中文标题兜底，但源本身可能更新较少）"
         )
 
     lines = [
         f"{bj_now} 上市公司 / 财经新闻精选（最近{RECENT_DAYS}天）：\n",
-        f"信息源：FortuneChina、央视财经等；已启用关键词过滤，只保留标题中包含 {KEYWORDS} 的新闻。\n",
+        f"信息源：FortuneChina、新浪财经、凤凰财经、东方财富策略报告等；\n"
+        f"优先按关键词过滤，如不足 {MIN_ITEMS_AFTER_KEYWORDS} 条，则按中文标题兜底补足。\n",
     ]
 
     for i, e in enumerate(entries, 1):
