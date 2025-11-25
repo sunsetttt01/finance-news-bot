@@ -6,15 +6,15 @@ from datetime import datetime, timedelta, timezone
 
 # ======= RSS 信息源（已帮你换成真实目标地址）=======
 RSS_URLS = [
-    # 还在正常工作的 FortuneChina 源
+   RSS_URLS = [
+    # FortuneChina（你之前实测是能推送出来的）
     "https://plink.anyfeeder.com/fortunechina",
 
-    # 经济观察网：金融 + 公司
-    "http://www.eeo.com.cn/finance/rss.xml",   # 金融投资
-    "http://www.eeo.com.cn/industry/rss.xml",  # 公司产业
+    # 凤凰财经：今日要闻
+    "http://finance.ifeng.com/rss/headnews.xml",
 
-    # 新浪财经：财经要闻汇总
-    "https://rss.sina.com.cn/roll/finance/hot_roll.xml",
+    # 东方财富：策略报告（RSSHub 提供）
+    "https://rsshub.app/eastmoney/report/strategyreport",
 
 ]
 
