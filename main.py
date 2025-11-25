@@ -6,9 +6,16 @@ from datetime import datetime, timedelta, timezone
 
 # ======= RSS 信息源（已帮你换成真实目标地址）=======
 RSS_URLS = [
-    "https://plink.anyfeeder.com/fortunechina",          # 财富中文网 / 商业
+     # 原来的两个
+    "https://plink.anyfeeder.com/fortunechina",          # 财富中文网 / 综合
     "https://plink.anyfeeder.com/weixin/cctvyscj",       # 央视财经公众号
-    # 以后想加别的，再在这里追加一行就行
+
+    # 你新加的这些：
+    "https://s.webfollow.cc/f/plink.anyfeeder.com/fortunechina/keji",   # 财富科技
+    "https://s.webfollow.cc/f/plink.anyfeeder.com/weixin/CBNweekly2008",# 第一财经周刊
+    "https://cn.wsj.com/zh-hans/rss",                                   # 华尔街日报中文版 RSS
+    "https://s.webfollow.cc/f/xueqiu.com/hots/topic/rss",               # 雪球热门话题
+    "https://s.webfollow.cc/f/plink.anyfeeder.com/eeo",                 # 经济观察报
 ]
 
 # 最近几天内的新闻才推送（含当天）
